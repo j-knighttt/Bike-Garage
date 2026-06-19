@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Bike Garage",
+    "slug": "bike-garage",
+    "scheme": "bikegarage",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bikegarage.app"
+    },
+    "android": {
+      "package": "com.bikegarage.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
