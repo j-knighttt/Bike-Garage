@@ -26,14 +26,17 @@ Garantie und Service.
   Intervalle passen sich Level und nassen Fahrten an.
 - **Hersteller-Service & Garantie**: Erstinspektion, Jahresinspektion und großer
   Service als garantierelevante Checkpoints.
-- **Strava**: Echte OAuth-Anbindung (Kilometer werden automatisch übernommen)
-  oder Demo-Modus zum Ausprobieren ohne Account. Manuelles Nachtragen ebenfalls
-  möglich.
+- **Strava**: Echte OAuth-Anbindung mit automatischem Token-Refresh (Kilometer
+  und Höhenmeter werden übernommen) oder Demo-Modus zum Ausprobieren ohne
+  Account. Manuelles Nachtragen ebenfalls möglich.
+- **Statistik**: Strava-artige Auswertung – Distanz, Höhenmeter, Fahrten und
+  Fahrzeit pro **Woche / Monat / Jahr / Gesamt**, ein Wochen-Trend-Balkendiagramm
+  sowie Highlights (längste Fahrt, Ø-Geschwindigkeit).
 
 ## Architektur
 
 ```
-app/                    Expo-Router-Screens (Tabs: Garage, Wartung, Strava, Profil)
+app/                    Expo-Router-Screens (Tabs: Garage, Wartung, Statistik, Strava, Profil)
   (tabs)/               Tab-Navigation
   bike/[id].tsx         Detail = digitaler Zwilling
   bike/add.tsx          Fahrrad / Komponente anlegen

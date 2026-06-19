@@ -43,10 +43,16 @@ export function getClientId(): string | undefined {
   return readConfig().clientId;
 }
 
+export interface StravaTokens {
+  accessToken: string;
+  refreshToken: string;
+  /** Epoch seconds when the access token expires. */
+  expiresAt: number;
+  athleteName?: string;
+}
+
 /** Exchange an OAuth authorization code for tokens. */
-export async function exchangeCode(
-  code: string,
-): Promise<{ accessToken: string; refreshToken: string; athleteName?: string }> {
+export async function exchangeCode(code: string): Promise<StravaTokens> {
   const { clientId, clientSecret } = readConfig();
   if (!clientId || !clientSecret) {
     throw new Error('Strava ist nicht konfiguriert.');
@@ -69,8 +75,55 @@ export async function exchangeCode(
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
+    expiresAt: data.expires_at,
     athleteName,
   };
+}
+
+/** Refresh an expired access token using the stored refresh token. */
+export async function refreshTokens(refreshToken: string): Promise<StravaTokens> {
+  const { clientId, clientSecret } = readConfig();
+  if (!clientId || !clientSecret) {
+    throw new Error('Strava ist nicht konfiguriert.');
+  }
+  const res = await fetch(STRAVA_DISCOVERY.tokenEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+  if (!res.ok) throw new Error(`Strava-Refresh-Fehler (${res.status})`);
+  const data = await res.json();
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresAt: data.expires_at,
+  };
+}
+
+/**
+ * Return a valid access token, refreshing first if it is within `skewSec` of
+ * expiry. Calls `onRefresh` with the new tokens so the caller can persist them.
+ */
+export async function ensureFreshToken(
+  current: { accessToken?: string; refreshToken?: string; expiresAt?: number },
+  onRefresh: (t: StravaTokens) => void,
+  skewSec = 120,
+): Promise<string> {
+  if (!current.accessToken || !current.refreshToken) {
+    throw new Error('Nicht mit Strava verbunden.');
+  }
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (current.expiresAt && current.expiresAt - skewSec > nowSec) {
+    return current.accessToken;
+  }
+  const fresh = await refreshTokens(current.refreshToken);
+  onRefresh(fresh);
+  return fresh.accessToken;
 }
 
 interface StravaApiActivity {
@@ -78,6 +131,7 @@ interface StravaApiActivity {
   name: string;
   distance: number; // meters
   moving_time: number; // seconds
+  total_elevation_gain?: number; // meters
   start_date_local: string;
   gear_id?: string | null;
   type?: string;
@@ -89,6 +143,7 @@ function mapActivity(a: StravaApiActivity): RideActivity {
     name: a.name,
     distanceKm: Math.round((a.distance / 1000) * 10) / 10,
     movingTimeSec: a.moving_time,
+    elevationGainM: a.total_elevation_gain ? Math.round(a.total_elevation_gain) : 0,
     startDate: a.start_date_local,
     gearId: a.gear_id ?? undefined,
   };
@@ -132,6 +187,7 @@ export function generateDemoRides(count = 4): RideActivity[] {
       name: names[i % names.length],
       distanceKm,
       movingTimeSec: Math.round((distanceKm / 27) * 3600),
+      elevationGainM: Math.round(distanceKm * (6 + Math.random() * 14)),
       startDate: new Date(now - i * 86400000 * 2).toISOString(),
       wet,
     });

@@ -140,6 +140,8 @@ export interface RideActivity {
   name: string;
   distanceKm: number;
   movingTimeSec: number;
+  /** Total elevation gain in meters. */
+  elevationGainM?: number;
   startDate: string;
   /** Strava gear id the ride was logged with, if any. */
   gearId?: string;

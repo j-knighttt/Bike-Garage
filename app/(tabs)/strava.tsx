@@ -8,6 +8,7 @@ import { Body, Button, Card, H1, H2, Row } from '../../src/components/ui';
 import {
   STRAVA_DISCOVERY,
   STRAVA_SCOPES,
+  ensureFreshToken,
   exchangeCode,
   fetchActivities,
   generateDemoRides,
@@ -53,6 +54,7 @@ export default function StravaScreen() {
           athleteName: tokens.athleteName,
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
+          expiresAt: tokens.expiresAt,
         });
         const rides = await fetchActivities(tokens.accessToken);
         applyActivities(rides);
@@ -69,7 +71,14 @@ export default function StravaScreen() {
     if (!strava.accessToken) return;
     try {
       setBusy(true);
-      const rides = await fetchActivities(strava.accessToken);
+      const token = await ensureFreshToken(strava, (t) =>
+        setStrava({
+          accessToken: t.accessToken,
+          refreshToken: t.refreshToken,
+          expiresAt: t.expiresAt,
+        }),
+      );
+      const rides = await fetchActivities(token);
       applyActivities(rides);
     } catch (e) {
       Alert.alert('Sync-Fehler', String(e instanceof Error ? e.message : e));

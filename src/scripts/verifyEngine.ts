@@ -4,6 +4,8 @@
  */
 import { makeBike } from '../domain/factories';
 import { bikeHealth, buildRecommendations, computeWear } from '../domain/maintenanceEngine';
+import { computeStats } from '../domain/stats';
+import { RideActivity } from '../domain/types';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -62,6 +64,22 @@ assert(begRec.diy === false, 'beginner is sent to the workshop for bottom bracke
 console.log('\nWarranty-relevant service intervals are present:');
 const sv = buildRecommendations(used, 'beginner').filter((r) => r.warrantyRelevant);
 assert(sv.length > 0, 'at least one warranty-relevant service interval surfaces');
+
+console.log('\nRide statistics aggregate by period:');
+const now = new Date('2026-06-19T12:00:00Z');
+const rides: RideActivity[] = [
+  { id: 'a', name: 'today', distanceKm: 40, movingTimeSec: 5400, elevationGainM: 500, startDate: '2026-06-19T08:00:00Z' },
+  { id: 'b', name: 'this week', distanceKm: 30, movingTimeSec: 3600, elevationGainM: 300, startDate: '2026-06-16T08:00:00Z' },
+  { id: 'c', name: 'this month', distanceKm: 60, movingTimeSec: 7200, elevationGainM: 800, startDate: '2026-06-02T08:00:00Z' },
+  { id: 'd', name: 'last year', distanceKm: 100, movingTimeSec: 12000, elevationGainM: 1200, startDate: '2025-06-02T08:00:00Z' },
+];
+const stats = computeStats(rides, now);
+assert(stats.week.distanceKm === 70, 'week distance = 40+30 (got ' + stats.week.distanceKm + ')');
+assert(stats.month.distanceKm === 130, 'month distance = 40+30+60 (got ' + stats.month.distanceKm + ')');
+assert(stats.year.distanceKm === 130, 'year distance excludes last year (got ' + stats.year.distanceKm + ')');
+assert(stats.allTime.distanceKm === 230, 'all-time distance = 230 (got ' + stats.allTime.distanceKm + ')');
+assert(stats.week.elevationM === 800, 'week elevation = 500+300 (got ' + stats.week.elevationM + ')');
+assert(stats.longestRideKm === 100, 'longest ride = 100 km (got ' + stats.longestRideKm + ')');
 
 if (failures > 0) {
   console.error(`\n${failures} assertion(s) failed`);

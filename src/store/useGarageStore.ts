@@ -13,6 +13,8 @@ export interface StravaState {
   lastSyncAt?: string;
   accessToken?: string;
   refreshToken?: string;
+  /** Epoch seconds when the access token expires. */
+  expiresAt?: number;
 }
 
 interface GarageState {
