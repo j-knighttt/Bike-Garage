@@ -15,18 +15,27 @@ import { Bike, RideActivity, RiderLevel } from '../domain/types';
  */
 
 // Show notifications even when the app is in the foreground.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Wrapped defensively: on web / during static export this must never throw.
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+} catch {
+  // no-op (e.g. web build)
+}
 
 const ANDROID_CHANNEL = 'maintenance';
 
+const isNative = Platform.OS === 'ios' || Platform.OS === 'android';
+
 /** Ask for permission (and set up the Android channel). Returns granted?. */
 export async function ensureNotificationPermission(): Promise<boolean> {
+  // Scheduled local reminders are a native-only feature here.
+  if (!isNative) return false;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
       name: 'Wartungserinnerungen',
@@ -77,6 +86,7 @@ export async function syncReminders(
   activities: RideActivity[],
   enabled: boolean,
 ): Promise<void> {
+  if (!isNative) return; // web can't schedule local notifications
   await Notifications.cancelAllScheduledNotificationsAsync();
   if (!enabled || bikes.length === 0) return;
 
@@ -113,5 +123,11 @@ export async function syncReminders(
 
 /** Turn everything off. */
 export async function cancelAllReminders(): Promise<void> {
+  if (!isNative) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
+}
+
+/** True on a real device, where scheduled reminders are available. */
+export function remindersSupported(): boolean {
+  return isNative;
 }

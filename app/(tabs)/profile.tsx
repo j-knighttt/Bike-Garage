@@ -4,7 +4,11 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Body, Card, H1, H2, Row } from '../../src/components/ui';
 import { RiderLevel } from '../../src/domain/types';
-import { cancelAllReminders, ensureNotificationPermission } from '../../src/services/notifications';
+import {
+  cancelAllReminders,
+  ensureNotificationPermission,
+  remindersSupported,
+} from '../../src/services/notifications';
 import { useGarageStore } from '../../src/store/useGarageStore';
 import { colors, radius, spacing } from '../../src/theme';
 
@@ -84,23 +88,39 @@ export default function ProfileScreen() {
 
       <H2 style={{ marginTop: spacing.sm }}>Erinnerungen</H2>
       <Card>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <Row style={{ flexShrink: 1 }}>
-            <Ionicons name="notifications-outline" size={20} color={colors.primary} />
-            <Body style={{ fontWeight: '700' }}>Wartungs-Erinnerungen</Body>
-          </Row>
-          <Pressable onPress={toggleNotifications}>
-            <Ionicons
-              name={notificationsEnabled ? 'toggle' : 'toggle-outline'}
-              size={36}
-              color={notificationsEnabled ? colors.primary : colors.textMuted}
-            />
-          </Pressable>
-        </Row>
-        <Body muted style={{ fontSize: 13 }}>
-          Wöchentlicher Check plus ein Hinweis, sobald nach einer Fahrt etwas fällig wird – als
-          Mitteilung direkt aufs iPhone.
-        </Body>
+        {remindersSupported() ? (
+          <>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Row style={{ flexShrink: 1 }}>
+                <Ionicons name="notifications-outline" size={20} color={colors.primary} />
+                <Body style={{ fontWeight: '700' }}>Wartungs-Erinnerungen</Body>
+              </Row>
+              <Pressable onPress={toggleNotifications}>
+                <Ionicons
+                  name={notificationsEnabled ? 'toggle' : 'toggle-outline'}
+                  size={36}
+                  color={notificationsEnabled ? colors.primary : colors.textMuted}
+                />
+              </Pressable>
+            </Row>
+            <Body muted style={{ fontSize: 13 }}>
+              Wöchentlicher Check plus ein Hinweis, sobald nach einer Fahrt etwas fällig wird – als
+              Mitteilung direkt aufs iPhone.
+            </Body>
+          </>
+        ) : (
+          <>
+            <Row style={{ flexShrink: 1 }}>
+              <Ionicons name="notifications-off-outline" size={20} color={colors.textMuted} />
+              <Body style={{ fontWeight: '700' }}>Erinnerungen</Body>
+            </Row>
+            <Body muted style={{ fontSize: 13 }}>
+              In der Web-Version (Home-Bildschirm-App) öffnest du die App und siehst offene
+              Wartungen direkt im Tab „Wartung". Automatische Push-Mitteilungen gibt es in der
+              nativen App-Version (später über TestFlight).
+            </Body>
+          </>
+        )}
       </Card>
 
       <Card style={{ marginTop: spacing.sm }}>

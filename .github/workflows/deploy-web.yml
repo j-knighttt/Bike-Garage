@@ -1,0 +1,59 @@
+name: Deploy Web (PWA)
+
+# Builds the Expo web export and publishes it to GitHub Pages on every push.
+# One-time setup: repo Settings → Pages → "Build and deployment" → Source:
+# "GitHub Actions". After that, the app auto-updates in the cloud on each push —
+# no laptop needed to use it.
+
+on:
+  push:
+    branches:
+      - claude/bike-maintenance-app-azfh1f
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # GitHub Pages serves project sites under /<repo-name>/, so the web build
+      # needs that as its base URL. We read the exact repo name (correct casing)
+      # straight from the event so links never break.
+      - name: Configure base URL for Pages subpath
+        run: |
+          node -e "const fs=require('fs');const p='app.json';const j=JSON.parse(fs.readFileSync(p));j.expo.experiments=Object.assign({},j.expo.experiments,{baseUrl:'/${{ github.event.repository.name }}'});fs.writeFileSync(p,JSON.stringify(j,null,2));"
+
+      - name: Build web (PWA)
+        run: npm run build:web
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

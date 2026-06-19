@@ -72,17 +72,41 @@ src/
 Die Domänen-Logik ist bewusst von React/Expo getrennt, damit die Engine isoliert
 getestet werden kann.
 
-## Loslegen
+## Als App aufs iPhone (gehostet, ohne Laptop)
+
+Die App wird als **Web-App (PWA)** in der Cloud gehostet und lässt sich als Icon
+auf den Home-Bildschirm legen – kein Laptop und keine Expo-App nötig.
+
+**Einmalig einrichten (im Browser):**
+1. Im GitHub-Repo: **Settings → Pages → Build and deployment → Source: „GitHub
+   Actions"** auswählen.
+2. Fertig. Der Workflow `Deploy Web (PWA)` baut und veröffentlicht die App bei
+   jedem Push automatisch. Die URL lautet danach:
+   `https://<dein-github-name>.github.io/<repo-name>/`
+
+**Aufs iPhone holen:**
+1. Diese URL in **Safari** öffnen.
+2. **Teilen-Symbol → „Zum Home-Bildschirm"**.
+3. Das Bike-Garage-Icon erscheint wie eine echte App und startet im Vollbild.
+
+Daten (Räder, Fahrten, Termine) werden lokal im Browser gespeichert.
+
+## Entwicklung
 
 ```bash
 npm install
-npm start          # Expo Dev Server – dann "Expo Go" auf dem iPhone scannen
+npm run web        # Web-Vorschau im Browser
+npm run build:web  # Produktions-Build (dist/) inkl. PWA-Tags
 npm run typecheck  # TypeScript prüfen
-npm test           # Engine-Checks (Verschleiß, Level-Logik, DIY/Werkstatt)
+npm test           # Engine-Checks (Verschleiß, Level-Logik, Zuordnung …)
+
+# Optional nativ (echte Push-Mitteilungen, App Store):
+npm start          # Expo Dev Server – "Expo Go" auf dem iPhone scannen
 ```
 
-Auf dem iPhone: kostenlose **Expo Go**-App installieren, QR-Code scannen.
-Für eine eigenständige App (TestFlight/App Store) später `eas build`.
+> Hinweis: Automatische Push-Mitteilungen für Wartungen gibt es nur in der
+> nativen App-Version (Expo Go / TestFlight). In der gehosteten Web-App siehst du
+> fällige Wartungen beim Öffnen direkt im Tab „Wartung".
 
 ## Strava einrichten (optional)
 
@@ -90,7 +114,8 @@ Ohne Zugangsdaten läuft die App im **Demo-Modus** (synthetische Fahrten, die
 echt in die Wartungsplanung einfließen). Für echte Strava-Daten:
 
 1. Unter https://www.strava.com/settings/api eine API-Anwendung anlegen.
-2. Als „Authorization Callback Domain" den Expo-Redirect hinterlegen.
+2. Als „Authorization Callback Domain" die Hosting-Domain hinterlegen
+   (für GitHub Pages: `<dein-github-name>.github.io`).
 3. Credentials als Umgebungsvariablen setzen (z. B. in `.env`):
 
    ```
