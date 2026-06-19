@@ -30,24 +30,34 @@ Garantie und Service.
   und Höhenmeter werden übernommen) oder Demo-Modus zum Ausprobieren ohne
   Account. Manuelles Nachtragen ebenfalls möglich.
 - **Statistik**: Strava-artige Auswertung – Distanz, Höhenmeter, Fahrten und
-  Fahrzeit pro **Woche / Monat / Jahr / Gesamt**, ein Wochen-Trend-Balkendiagramm
-  sowie Highlights (längste Fahrt, Ø-Geschwindigkeit).
+  Fahrzeit pro **Woche / Monat / Jahr / Gesamt**, Vergleich zur Vorperiode
+  (+/- %), umschaltbares Trend-Diagramm (km ⇄ Höhenmeter), Aufschlüsselung pro
+  Fahrrad sowie Highlights (längste Fahrt, Ø-Geschwindigkeit).
+- **Werkstatt & Pflege**: Dienstleister in der Nähe (Werkstätten, mobile
+  Mechaniker, Reinigungen) – sortiert nach **Entfernung** (Standort), filterbar
+  nach Leistung, mit **öffentlichen Preisen**, Kontaktaktionen (anrufen, Route,
+  Website) und **Terminanfragen**, die unter „Meine Termine" verwaltet werden.
+  Aus jeder „Werkstatt empfohlen"-Wartung führt ein direkter Sprung dorthin.
 
 ## Architektur
 
 ```
-app/                    Expo-Router-Screens (Tabs: Garage, Wartung, Statistik, Strava, Profil)
-  (tabs)/               Tab-Navigation
+app/                    Expo-Router-Screens
+  (tabs)/               Tabs: Garage, Wartung, Statistik, Werkstatt, Strava, Profil
   bike/[id].tsx         Detail = digitaler Zwilling
   bike/add.tsx          Fahrrad / Komponente anlegen
+  provider/[id].tsx     Dienstleister-Detail (Leistungen, Preise, Termin)
 src/
   domain/               Framework-unabhängige Logik (testbar)
     types.ts            Datenmodell
     componentCatalog.ts Lebensdauern, DIY-Schwierigkeit, Level-Parameter
     maintenanceEngine.ts Verschleiß- & Empfehlungs-Engine  ← Herzstück
+    stats.ts            Fahr-Statistiken (Woche/Monat/Jahr, Trends, Vergleich)
+    providers.ts        Dienstleister, Preise, Distanz, Buchungen
     factories.ts        Bikes/Komponenten/Service-Intervalle erzeugen
   store/                Zustand-Store + lokale Persistenz (AsyncStorage)
-  services/strava.ts    Strava OAuth + Activities + Demo-Daten
+  services/strava.ts    Strava OAuth + Token-Refresh + Activities + Demo-Daten
+  hooks/useUserLocation.ts  Standort (expo-location) mit Fallback
   components/, theme/    UI-Bausteine
 ```
 
@@ -86,7 +96,8 @@ echt in die Wartungsplanung einfließen). Für echte Strava-Daten:
 
 ## Roadmap
 
-- [ ] Dienstleister in der Nähe finden & Reinigung/Wartung buchen (mit Preisen)
+- [x] Dienstleister in der Nähe finden, Preise, Terminanfragen
+- [ ] Echte Anbieter-Daten/-Buchung über Partner-API (statt Demo-Verzeichnis)
 - [ ] Push-Erinnerungen für fällige Wartungen
 - [ ] Marken-/Modell-spezifische Service-Intervalle automatisch befüllen
 - [ ] Foto-Doku & Belege pro Komponente

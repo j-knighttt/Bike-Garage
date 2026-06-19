@@ -12,8 +12,11 @@ export interface RideStats {
   month: StatBucket;
   year: StatBucket;
   allTime: StatBucket;
-  /** Distance per ISO week for the most recent weeks (oldest → newest). */
-  weeklyTrend: { label: string; distanceKm: number }[];
+  /** Same period, one step back — for "vs. last week/month" comparisons. */
+  prevWeek: StatBucket;
+  prevMonth: StatBucket;
+  /** Distance + elevation per ISO week for recent weeks (oldest → newest). */
+  weeklyTrend: { label: string; distanceKm: number; elevationM: number }[];
   longestRideKm: number;
   avgSpeedKmh: number;
 }
@@ -45,15 +48,20 @@ export function computeStats(
   const month = empty();
   const year = empty();
   const allTime = empty();
+  const prevWeek = empty();
+  const prevMonth = empty();
 
   const weekStart = startOfWeek(now).getTime();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
+  const MS_WEEK = 7 * 86400000;
+  const prevWeekStart = weekStart - MS_WEEK;
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
 
   // Buckets for the weekly trend (index 0 = current week).
-  const trend: number[] = new Array(weeksOfTrend).fill(0);
-  const currentWeekStart = startOfWeek(now).getTime();
-  const MS_WEEK = 7 * 86400000;
+  const trendDist: number[] = new Array(weeksOfTrend).fill(0);
+  const trendElev: number[] = new Array(weeksOfTrend).fill(0);
+  const currentWeekStart = weekStart;
 
   let longestRideKm = 0;
 
@@ -63,19 +71,23 @@ export function computeStats(
     add(allTime, ride);
     if (t >= yearStart) add(year, ride);
     if (t >= monthStart) add(month, ride);
+    else if (t >= prevMonthStart) add(prevMonth, ride);
     if (t >= weekStart) add(week, ride);
+    else if (t >= prevWeekStart) add(prevWeek, ride);
     if (ride.distanceKm > longestRideKm) longestRideKm = ride.distanceKm;
 
     const weeksAgo = Math.floor((currentWeekStart - startOfWeek(new Date(t)).getTime()) / MS_WEEK);
     if (weeksAgo >= 0 && weeksAgo < weeksOfTrend) {
-      trend[weeksAgo] += ride.distanceKm;
+      trendDist[weeksAgo] += ride.distanceKm;
+      trendElev[weeksAgo] += ride.elevationGainM ?? 0;
     }
   }
 
-  const weeklyTrend = trend
+  const weeklyTrend = trendDist
     .map((distanceKm, i) => ({
       label: i === 0 ? 'Diese' : `−${i}`,
       distanceKm: round1(distanceKm),
+      elevationM: Math.round(trendElev[i]),
     }))
     .reverse();
 
@@ -87,10 +99,18 @@ export function computeStats(
     month: roundBucket(month),
     year: roundBucket(year),
     allTime: roundBucket(allTime),
+    prevWeek: roundBucket(prevWeek),
+    prevMonth: roundBucket(prevMonth),
     weeklyTrend,
     longestRideKm: round1(longestRideKm),
     avgSpeedKmh: Math.round(avgSpeedKmh * 10) / 10,
   };
+}
+
+/** Signed percentage change from `prev` to `current` (e.g. +23, -10). null if no baseline. */
+export function percentChange(current: number, prev: number): number | null {
+  if (prev <= 0) return current > 0 ? 100 : null;
+  return Math.round(((current - prev) / prev) * 100);
 }
 
 function roundBucket(b: StatBucket): StatBucket {

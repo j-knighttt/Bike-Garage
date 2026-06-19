@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="bike/add" options={{ title: 'Fahrrad hinzufügen', presentation: 'modal' }} />
         <Stack.Screen name="bike/[id]" options={{ title: 'Fahrrad' }} />
+        <Stack.Screen name="provider/[id]" options={{ title: 'Dienstleister' }} />
       </Stack>
     </SafeAreaProvider>
   );

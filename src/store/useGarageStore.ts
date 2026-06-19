@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { makeBike, NewBikeInput, NewComponentInput, makeComponent } from '../domain/factories';
+import { Booking, BookingStatus } from '../domain/providers';
 import { Bike, RideActivity, RiderLevel } from '../domain/types';
 import { uid } from '../utils/id';
 
@@ -24,8 +25,13 @@ interface GarageState {
   activities: RideActivity[];
   processedRideIds: string[];
   strava: StravaState;
+  bookings: Booking[];
 
   setLevel: (level: RiderLevel) => void;
+
+  addBooking: (booking: Omit<Booking, 'id' | 'createdAt' | 'status'>) => Booking;
+  updateBookingStatus: (id: string, status: BookingStatus) => void;
+  removeBooking: (id: string) => void;
 
   addBike: (input: NewBikeInput) => Bike;
   updateBike: (id: string, patch: Partial<Bike>) => void;
@@ -73,8 +79,28 @@ export const useGarageStore = create<GarageState>()(
       activities: [],
       processedRideIds: [],
       strava: { connected: false },
+      bookings: [],
 
       setLevel: (level) => set({ level }),
+
+      addBooking: (input) => {
+        const booking: Booking = {
+          ...input,
+          id: uid('book-'),
+          status: 'requested',
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({ bookings: [booking, ...s.bookings] }));
+        return booking;
+      },
+
+      updateBookingStatus: (id, status) =>
+        set((s) => ({
+          bookings: s.bookings.map((b) => (b.id === id ? { ...b, status } : b)),
+        })),
+
+      removeBooking: (id) =>
+        set((s) => ({ bookings: s.bookings.filter((b) => b.id !== id) })),
 
       addBike: (input) => {
         const bike = makeBike(input);

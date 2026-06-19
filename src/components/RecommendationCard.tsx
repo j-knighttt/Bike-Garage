@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
 import { Recommendation } from '../domain/types';
@@ -13,6 +14,7 @@ export function RecommendationCard({
   rec: Recommendation;
   bikeName?: string;
 }) {
+  const router = useRouter();
   const replaceComponent = useGarageStore((s) => s.replaceComponent);
   const markCareDone = useGarageStore((s) => s.markCareDone);
   const markServiceDone = useGarageStore((s) => s.markServiceDone);
@@ -46,9 +48,17 @@ export function RecommendationCard({
         </Row>
         <Body muted style={{ fontSize: 13 }}>{rec.dueIn}</Body>
       </Row>
-      <View style={{ marginTop: spacing.xs }}>
-        <Button title="Erledigt ✓" variant="secondary" onPress={onDone} />
-      </View>
+      <Row style={{ marginTop: spacing.xs, gap: spacing.sm }}>
+        <Button title="Erledigt ✓" variant="secondary" onPress={onDone} style={{ flex: 1 }} />
+        {!rec.diy && (
+          <Button
+            title="Werkstatt finden"
+            variant="ghost"
+            onPress={() => router.push('/services')}
+            style={{ flex: 1 }}
+          />
+        )}
+      </Row>
     </Card>
   );
 }

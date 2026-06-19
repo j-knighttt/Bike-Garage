@@ -18,7 +18,15 @@
       "bundler": "metro",
       "output": "single"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Bike Garage nutzt deinen Standort, um Werkstätten und Reinigungen in deiner Nähe zu finden."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

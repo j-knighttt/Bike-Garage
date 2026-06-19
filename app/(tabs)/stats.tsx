@@ -3,11 +3,12 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Body, Card, H1, H2, Row } from '../../src/components/ui';
-import { StatBucket, computeStats, formatDuration } from '../../src/domain/stats';
+import { computeStats, formatDuration, percentChange } from '../../src/domain/stats';
 import { useGarageStore } from '../../src/store/useGarageStore';
 import { colors, radius, spacing } from '../../src/theme';
 
 type PeriodKey = 'week' | 'month' | 'year' | 'allTime';
+type Metric = 'distance' | 'elevation';
 
 const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: 'week', label: 'Woche' },
@@ -21,11 +22,23 @@ export default function StatsScreen() {
   const activities = useGarageStore((s) => s.activities);
   const bikes = useGarageStore((s) => s.bikes);
   const [period, setPeriod] = useState<PeriodKey>('week');
+  const [metric, setMetric] = useState<Metric>('distance');
 
   const stats = useMemo(() => computeStats(activities), [activities]);
   const bucket = stats[period];
-  const maxTrend = Math.max(1, ...stats.weeklyTrend.map((w) => w.distanceKm));
 
+  // Comparison vs. the previous comparable period (week / month only).
+  const delta = useMemo(() => {
+    if (period === 'week') return percentChange(stats.week.distanceKm, stats.prevWeek.distanceKm);
+    if (period === 'month') return percentChange(stats.month.distanceKm, stats.prevMonth.distanceKm);
+    return null;
+  }, [period, stats]);
+
+  const trendValues = stats.weeklyTrend.map((w) =>
+    metric === 'distance' ? w.distanceKm : w.elevationM,
+  );
+  const maxTrend = Math.max(1, ...trendValues);
+  const maxBikeKm = Math.max(1, ...bikes.map((b) => b.totalKm));
   const totalGarageKm = bikes.reduce((sum, b) => sum + b.totalKm, 0);
 
   return (
@@ -66,37 +79,85 @@ export default function StatsScreen() {
           {/* Headline metrics for the selected period */}
           <Card>
             <Row style={{ justifyContent: 'space-between' }}>
-              <Metric icon="bicycle" label="Distanz" value={`${bucket.distanceKm.toLocaleString('de-DE')} km`} />
-              <Metric icon="trending-up" label="Höhenmeter" value={`${bucket.elevationM.toLocaleString('de-DE')} m`} />
+              <Metric_ icon="bicycle" label="Distanz" value={`${bucket.distanceKm.toLocaleString('de-DE')} km`} />
+              <Metric_ icon="trending-up" label="Höhenmeter" value={`${bucket.elevationM.toLocaleString('de-DE')} m`} />
             </Row>
             <View style={styles.divider} />
             <Row style={{ justifyContent: 'space-between' }}>
-              <Metric icon="repeat" label="Fahrten" value={`${bucket.rides}`} />
-              <Metric icon="time-outline" label="Fahrzeit" value={formatDuration(bucket.movingTimeSec)} />
+              <Metric_ icon="repeat" label="Fahrten" value={`${bucket.rides}`} />
+              <Metric_ icon="time-outline" label="Fahrzeit" value={formatDuration(bucket.movingTimeSec)} />
             </Row>
+            {delta !== null && (
+              <>
+                <View style={styles.divider} />
+                <Row>
+                  <Ionicons
+                    name={delta >= 0 ? 'arrow-up' : 'arrow-down'}
+                    size={16}
+                    color={delta >= 0 ? colors.ok : colors.due}
+                  />
+                  <Body style={{ color: delta >= 0 ? colors.ok : colors.due, fontWeight: '700' }}>
+                    {delta >= 0 ? '+' : ''}{delta}%
+                  </Body>
+                  <Body muted>vs. {period === 'week' ? 'letzte Woche' : 'letzter Monat'}</Body>
+                </Row>
+              </>
+            )}
           </Card>
 
-          {/* Weekly trend mini bar chart */}
-          <H2 style={{ marginTop: spacing.sm }}>Wochen-Trend (km)</H2>
+          {/* Trend chart with metric toggle */}
+          <Row style={{ justifyContent: 'space-between' }}>
+            <H2>Wochen-Trend</H2>
+            <Row style={{ gap: spacing.xs }}>
+              <Toggle label="km" active={metric === 'distance'} onPress={() => setMetric('distance')} />
+              <Toggle label="Hm" active={metric === 'elevation'} onPress={() => setMetric('elevation')} />
+            </Row>
+          </Row>
           <Card>
             <Row style={{ alignItems: 'flex-end', height: 120, gap: spacing.sm }}>
-              {stats.weeklyTrend.map((w, i) => (
-                <View key={i} style={styles.barCol}>
-                  <Body muted style={{ fontSize: 11 }}>{Math.round(w.distanceKm)}</Body>
-                  <View
-                    style={[
-                      styles.bar,
-                      {
-                        height: Math.max(4, (w.distanceKm / maxTrend) * 90),
-                        backgroundColor: i === stats.weeklyTrend.length - 1 ? colors.primary : colors.primaryDim,
-                      },
-                    ]}
-                  />
-                  <Body muted style={{ fontSize: 11 }}>{w.label}</Body>
-                </View>
-              ))}
+              {stats.weeklyTrend.map((w, i) => {
+                const value = metric === 'distance' ? w.distanceKm : w.elevationM;
+                return (
+                  <View key={i} style={styles.barCol}>
+                    <Body muted style={{ fontSize: 11 }}>{Math.round(value)}</Body>
+                    <View
+                      style={[
+                        styles.bar,
+                        {
+                          height: Math.max(4, (value / maxTrend) * 90),
+                          backgroundColor: i === stats.weeklyTrend.length - 1 ? colors.primary : colors.primaryDim,
+                        },
+                      ]}
+                    />
+                    <Body muted style={{ fontSize: 11 }}>{w.label}</Body>
+                  </View>
+                );
+              })}
             </Row>
+            <Body muted style={{ fontSize: 12, textAlign: 'center' }}>
+              {metric === 'distance' ? 'Kilometer pro Woche' : 'Höhenmeter pro Woche'}
+            </Body>
           </Card>
+
+          {/* Per-bike breakdown */}
+          {bikes.length > 0 && (
+            <>
+              <H2 style={{ marginTop: spacing.sm }}>Pro Fahrrad</H2>
+              <Card>
+                {bikes.map((b, i) => (
+                  <View key={b.id} style={{ gap: 4, marginTop: i === 0 ? 0 : spacing.md }}>
+                    <Row style={{ justifyContent: 'space-between' }}>
+                      <Body style={{ fontWeight: '700' }}>{b.name}</Body>
+                      <Body muted>{Math.round(b.totalKm).toLocaleString('de-DE')} km</Body>
+                    </Row>
+                    <View style={styles.track}>
+                      <View style={[styles.trackFill, { width: `${Math.round((b.totalKm / maxBikeKm) * 100)}%` }]} />
+                    </View>
+                  </View>
+                ))}
+              </Card>
+            </>
+          )}
 
           {/* Highlights */}
           <H2 style={{ marginTop: spacing.sm }}>Highlights</H2>
@@ -121,7 +182,7 @@ export default function StatsScreen() {
   );
 }
 
-function Metric({
+function Metric_({
   icon,
   label,
   value,
@@ -141,6 +202,16 @@ function Metric({
   );
 }
 
+function Toggle({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.toggle, active && styles.tabActive]}>
+      <Body style={{ color: active ? '#fff' : colors.textMuted, fontWeight: '700', fontSize: 13 }}>
+        {label}
+      </Body>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   tab: {
@@ -153,6 +224,14 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  toggle: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border,
@@ -160,4 +239,6 @@ const styles = StyleSheet.create({
   },
   barCol: { flex: 1, alignItems: 'center', gap: 4 },
   bar: { width: '70%', borderRadius: radius.sm },
+  track: { height: 8, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
+  trackFill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.primary },
 });

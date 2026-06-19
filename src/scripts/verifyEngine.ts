@@ -4,7 +4,8 @@
  */
 import { makeBike } from '../domain/factories';
 import { bikeHealth, buildRecommendations, computeWear } from '../domain/maintenanceEngine';
-import { computeStats } from '../domain/stats';
+import { computeStats, percentChange } from '../domain/stats';
+import { DEMO_PROVIDERS, distanceKm, formatPrice, sortByDistance } from '../domain/providers';
 import { RideActivity } from '../domain/types';
 
 let failures = 0;
@@ -80,6 +81,26 @@ assert(stats.year.distanceKm === 130, 'year distance excludes last year (got ' +
 assert(stats.allTime.distanceKm === 230, 'all-time distance = 230 (got ' + stats.allTime.distanceKm + ')');
 assert(stats.week.elevationM === 800, 'week elevation = 500+300 (got ' + stats.week.elevationM + ')');
 assert(stats.longestRideKm === 100, 'longest ride = 100 km (got ' + stats.longestRideKm + ')');
+
+console.log('\nPeriod comparison:');
+assert(percentChange(120, 100) === 20, 'percentChange 100→120 = +20%');
+assert(percentChange(50, 100) === -50, 'percentChange 100→50 = -50%');
+assert(percentChange(10, 0) === 100, 'percentChange from zero baseline = 100%');
+
+console.log('\nService providers & distance:');
+const berlin = { lat: 52.52, lng: 13.405 };
+const munich = { lat: 48.137, lng: 11.575 };
+const d = distanceKm(berlin, munich);
+assert(d > 480 && d < 520, 'Berlin↔Munich ~504 km (got ' + Math.round(d) + ')');
+const sorted = sortByDistance(DEMO_PROVIDERS, berlin);
+const distances = sorted.map((p) => p.distanceKm ?? 0);
+assert(
+  distances.every((v, i) => i === 0 || v >= distances[i - 1]),
+  'providers sorted nearest-first',
+);
+assert(formatPrice({ type: 'cleaning', label: 'x', priceFromEur: 19, priceToEur: 39 }) === '19–39 €', 'price range formats');
+assert(formatPrice({ type: 'cleaning', label: 'x', priceFromEur: 25 }) === 'ab 25 €', 'price "ab" formats');
+assert(formatPrice({ type: 'cleaning', label: 'x' }) === 'auf Anfrage', 'price "auf Anfrage" formats');
 
 if (failures > 0) {
   console.error(`\n${failures} assertion(s) failed`);
