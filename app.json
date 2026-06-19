@@ -25,6 +25,12 @@
         {
           "locationWhenInUsePermission": "Bike Garage nutzt deinen Standort, um Werkstätten und Reinigungen in deiner Nähe zu finden."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#fc4c02"
+        }
       ]
     ],
     "experiments": {

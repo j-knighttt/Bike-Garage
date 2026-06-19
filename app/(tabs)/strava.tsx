@@ -8,9 +8,11 @@ import { Body, Button, Card, H1, H2, Row } from '../../src/components/ui';
 import {
   STRAVA_DISCOVERY,
   STRAVA_SCOPES,
+  StravaGear,
   ensureFreshToken,
   exchangeCode,
   fetchActivities,
+  fetchAthleteGear,
   generateDemoRides,
   getClientId,
   isStravaConfigured,
@@ -24,9 +26,15 @@ export default function StravaScreen() {
   const insets = useSafeAreaInsets();
   const strava = useGarageStore((s) => s.strava);
   const activities = useGarageStore((s) => s.activities);
+  const bikes = useGarageStore((s) => s.bikes);
+  const defaultBikeId = useGarageStore((s) => s.defaultBikeId);
   const setStrava = useGarageStore((s) => s.setStrava);
   const applyActivities = useGarageStore((s) => s.applyActivities);
+  const setDefaultBike = useGarageStore((s) => s.setDefaultBike);
+  const setBikeStravaGear = useGarageStore((s) => s.setBikeStravaGear);
+  const assignRideToBike = useGarageStore((s) => s.assignRideToBike);
   const [busy, setBusy] = useState(false);
+  const [gear, setGear] = useState<StravaGear[]>([]);
 
   const configured = isStravaConfigured();
   const redirectUri = AuthSession.makeRedirectUri({ scheme: 'bikegarage' });
@@ -42,6 +50,19 @@ export default function StravaScreen() {
     STRAVA_DISCOVERY,
   );
 
+  const bikeName = (id?: string) => bikes.find((b) => b.id === id)?.name;
+
+  const pickBike = (title: string, onPick: (bikeId: string) => void) => {
+    if (bikes.length === 0) {
+      Alert.alert('Kein Fahrrad', 'Lege zuerst ein Fahrrad in der Garage an.');
+      return;
+    }
+    Alert.alert(title, undefined, [
+      ...bikes.map((b) => ({ text: b.name, onPress: () => onPick(b.id) })),
+      { text: 'Abbrechen', style: 'cancel' as const },
+    ]);
+  };
+
   useEffect(() => {
     if (response?.type !== 'success' || !response.params.code) return;
     (async () => {
@@ -56,7 +77,11 @@ export default function StravaScreen() {
           refreshToken: tokens.refreshToken,
           expiresAt: tokens.expiresAt,
         });
-        const rides = await fetchActivities(tokens.accessToken);
+        const [rides, gearList] = await Promise.all([
+          fetchActivities(tokens.accessToken),
+          fetchAthleteGear(tokens.accessToken).catch(() => []),
+        ]);
+        setGear(gearList);
         applyActivities(rides);
       } catch (e) {
         Alert.alert('Strava-Fehler', String(e instanceof Error ? e.message : e));
@@ -78,7 +103,11 @@ export default function StravaScreen() {
           expiresAt: t.expiresAt,
         }),
       );
-      const rides = await fetchActivities(token);
+      const [rides, gearList] = await Promise.all([
+        fetchActivities(token),
+        fetchAthleteGear(token).catch(() => []),
+      ]);
+      setGear(gearList);
       applyActivities(rides);
     } catch (e) {
       Alert.alert('Sync-Fehler', String(e instanceof Error ? e.message : e));
@@ -91,6 +120,8 @@ export default function StravaScreen() {
     setStrava({ connected: true, demo: true, athleteName: 'Demo-Fahrer:in' });
     applyActivities(generateDemoRides(4));
   };
+
+  const unassigned = activities.filter((a) => !a.bikeId);
 
   return (
     <ScrollView
@@ -143,6 +174,74 @@ export default function StravaScreen() {
         )}
       </Card>
 
+      {/* Default bike for rides that can't be matched automatically */}
+      {bikes.length > 1 && (
+        <Card>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Body style={{ fontWeight: '700', flexShrink: 1 }}>Standard-Fahrrad</Body>
+            <Button
+              title={bikeName(defaultBikeId) ?? 'Wählen'}
+              variant="secondary"
+              onPress={() => pickBike('Standard-Fahrrad wählen', setDefaultBike)}
+            />
+          </Row>
+          <Body muted style={{ fontSize: 13 }}>
+            Fahrten ohne erkanntes Strava-Rad werden diesem Fahrrad zugeordnet.
+          </Body>
+        </Card>
+      )}
+
+      {/* Map Strava bikes (gear) to garage bikes */}
+      {gear.length > 0 && (
+        <>
+          <H2 style={{ marginTop: spacing.sm }}>Strava-Räder zuordnen</H2>
+          {gear.map((g) => {
+            const linked = bikes.find((b) => b.stravaGearId === g.id);
+            return (
+              <Card key={g.id}>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <Body style={{ fontWeight: '700', flexShrink: 1 }}>{g.name}</Body>
+                  <Button
+                    title={linked ? linked.name : 'Zuordnen'}
+                    variant="secondary"
+                    onPress={() =>
+                      pickBike(`„${g.name}" zuordnen`, (bikeId) => setBikeStravaGear(bikeId, g.id))
+                    }
+                  />
+                </Row>
+                <Body muted style={{ fontSize: 13 }}>{g.distanceKm.toLocaleString('de-DE')} km bei Strava</Body>
+              </Card>
+            );
+          })}
+        </>
+      )}
+
+      {/* Rides that still need a bike */}
+      {unassigned.length > 0 && bikes.length > 0 && (
+        <>
+          <H2 style={{ marginTop: spacing.sm }}>Nicht zugeordnete Fahrten</H2>
+          <Body muted style={{ fontSize: 13 }}>
+            Diese Fahrten zählen noch zu keinem Rad. Tippe „Zuordnen".
+          </Body>
+          {unassigned.slice(0, 20).map((a) => (
+            <Card key={a.id}>
+              <Row style={{ justifyContent: 'space-between' }}>
+                <Body style={{ fontWeight: '700', flexShrink: 1 }}>{a.name}</Body>
+                <Body>{a.distanceKm.toLocaleString('de-DE')} km</Body>
+              </Row>
+              <Row style={{ justifyContent: 'space-between', marginTop: spacing.xs }}>
+                <Body muted style={{ fontSize: 13 }}>{new Date(a.startDate).toLocaleDateString('de-DE')}</Body>
+                <Button
+                  title="Zuordnen"
+                  variant="secondary"
+                  onPress={() => pickBike('Fahrt zuordnen', (bikeId) => assignRideToBike(a.id, bikeId))}
+                />
+              </Row>
+            </Card>
+          ))}
+        </>
+      )}
+
       <H2 style={{ marginTop: spacing.sm }}>Letzte Fahrten</H2>
       {activities.length === 0 && (
         <Card>
@@ -155,10 +254,15 @@ export default function StravaScreen() {
             <Body style={{ fontWeight: '700', flexShrink: 1 }}>{a.name}</Body>
             <Body>{a.distanceKm.toLocaleString('de-DE')} km</Body>
           </Row>
-          <Body muted style={{ fontSize: 13 }}>
-            {new Date(a.startDate).toLocaleDateString('de-DE')}
-            {a.wet ? ' · nass 🌧️' : ''}
-          </Body>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Body muted style={{ fontSize: 13 }}>
+              {new Date(a.startDate).toLocaleDateString('de-DE')}
+              {a.wet ? ' · nass 🌧️' : ''}
+            </Body>
+            <Body muted style={{ fontSize: 13 }}>
+              {bikeName(a.bikeId) ?? 'nicht zugeordnet'}
+            </Body>
+          </Row>
         </Card>
       ))}
     </ScrollView>

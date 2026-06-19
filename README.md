@@ -29,6 +29,12 @@ Garantie und Service.
 - **Strava**: Echte OAuth-Anbindung mit automatischem Token-Refresh (Kilometer
   und Höhenmeter werden übernommen) oder Demo-Modus zum Ausprobieren ohne
   Account. Manuelles Nachtragen ebenfalls möglich.
+- **Fahrten ↔ Räder**: Strava-Räder (Gear) lassen sich deinen Garagen-Rädern
+  zuordnen; bei einem Rad läuft alles automatisch dorthin, bei mehreren gibt es
+  ein Standard-Rad und eine schnelle Zuordnung einzelner Fahrten. Kilometer
+  landen so beim richtigen Rad und treiben dessen Verschleiß an.
+- **Erinnerungen**: Lokale Push-Mitteilungen aufs iPhone – ein wöchentlicher
+  Wartungs-Check plus ein Hinweis, sobald nach einer Fahrt etwas fällig wird.
 - **Statistik**: Strava-artige Auswertung – Distanz, Höhenmeter, Fahrten und
   Fahrzeit pro **Woche / Monat / Jahr / Gesamt**, Vergleich zur Vorperiode
   (+/- %), umschaltbares Trend-Diagramm (km ⇄ Höhenmeter), Aufschlüsselung pro
@@ -56,7 +62,9 @@ src/
     providers.ts        Dienstleister, Preise, Distanz, Buchungen
     factories.ts        Bikes/Komponenten/Service-Intervalle erzeugen
   store/                Zustand-Store + lokale Persistenz (AsyncStorage)
-  services/strava.ts    Strava OAuth + Token-Refresh + Activities + Demo-Daten
+    rideAssignment.ts   Fahrten den richtigen Rädern zuordnen (testbar)
+  services/strava.ts    Strava OAuth + Token-Refresh + Activities + Gear + Demo
+  services/notifications.ts  Lokale Wartungs-Erinnerungen (expo-notifications)
   hooks/useUserLocation.ts  Standort (expo-location) mit Fallback
   components/, theme/    UI-Bausteine
 ```
@@ -97,8 +105,10 @@ echt in die Wartungsplanung einfließen). Für echte Strava-Daten:
 ## Roadmap
 
 - [x] Dienstleister in der Nähe finden, Preise, Terminanfragen
+- [x] Lokale Push-Erinnerungen für fällige Wartungen
+- [x] Strava-Fahrten einzelnen Rädern zuordnen (Gear-Mapping)
 - [ ] Echte Anbieter-Daten/-Buchung über Partner-API (statt Demo-Verzeichnis)
-- [ ] Push-Erinnerungen für fällige Wartungen
+- [ ] Remote-Push über Backend (statt nur lokale Erinnerungen)
 - [ ] Marken-/Modell-spezifische Service-Intervalle automatisch befüllen
 - [ ] Foto-Doku & Belege pro Komponente
 - [ ] Eigenständiger Build über EAS (TestFlight)

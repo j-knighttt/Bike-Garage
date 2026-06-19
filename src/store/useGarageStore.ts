@@ -3,6 +3,11 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { makeBike, NewBikeInput, NewComponentInput, makeComponent } from '../domain/factories';
 import { Booking, BookingStatus } from '../domain/providers';
+import {
+  assignUnassignedByGear,
+  distributeRides,
+  moveRideToBike,
+} from '../domain/rideAssignment';
 import { Bike, RideActivity, RiderLevel } from '../domain/types';
 import { uid } from '../utils/id';
 
@@ -26,8 +31,19 @@ interface GarageState {
   processedRideIds: string[];
   strava: StravaState;
   bookings: Booking[];
+  /** Bike that unmatched rides are assigned to (when more than one bike). */
+  defaultBikeId?: string;
+  /** Whether local maintenance reminders are switched on. */
+  notificationsEnabled: boolean;
 
   setLevel: (level: RiderLevel) => void;
+  setDefaultBike: (bikeId?: string) => void;
+  setNotificationsEnabled: (enabled: boolean) => void;
+
+  /** Link a Strava gear id to a bike and retro-assign its unassigned rides. */
+  setBikeStravaGear: (bikeId: string, gearId?: string) => void;
+  /** Assign / move a single stored ride to a bike. */
+  assignRideToBike: (rideId: string, bikeId: string) => void;
 
   addBooking: (booking: Omit<Booking, 'id' | 'createdAt' | 'status'>) => Booking;
   updateBookingStatus: (id: string, status: BookingStatus) => void;
@@ -52,24 +68,6 @@ interface GarageState {
   addManualKm: (bikeId: string, km: number) => void;
 }
 
-function applyRidesToBikes(
-  bikes: Bike[],
-  rides: RideActivity[],
-): Bike[] {
-  if (rides.length === 0) return bikes;
-  const onlyBike = bikes.length === 1 ? bikes[0] : undefined;
-  return bikes.map((bike) => {
-    const matched = rides.filter(
-      (r) =>
-        (bike.stravaGearId && r.gearId === bike.stravaGearId) ||
-        (!r.gearId && onlyBike?.id === bike.id),
-    );
-    if (matched.length === 0) return bike;
-    const addedKm = matched.reduce((sum, r) => sum + r.distanceKm, 0);
-    return { ...bike, totalKm: round1(bike.totalKm + addedKm) };
-  });
-}
-
 export const useGarageStore = create<GarageState>()(
   persist(
     (set, get) => ({
@@ -80,8 +78,25 @@ export const useGarageStore = create<GarageState>()(
       processedRideIds: [],
       strava: { connected: false },
       bookings: [],
+      defaultBikeId: undefined,
+      notificationsEnabled: false,
 
       setLevel: (level) => set({ level }),
+      setDefaultBike: (bikeId) => set({ defaultBikeId: bikeId }),
+      setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
+
+      setBikeStravaGear: (bikeId, gearId) =>
+        set((s) => {
+          const bikes = s.bikes.map((b) =>
+            b.id === bikeId ? { ...b, stravaGearId: gearId } : b,
+          );
+          if (!gearId) return { bikes };
+          const moved = assignUnassignedByGear(bikes, s.activities, gearId, bikeId);
+          return { bikes: moved.bikes, activities: moved.activities };
+        }),
+
+      assignRideToBike: (rideId, bikeId) =>
+        set((s) => moveRideToBike(s.bikes, s.activities, rideId, bikeId)),
 
       addBooking: (input) => {
         const booking: Booking = {
@@ -189,18 +204,21 @@ export const useGarageStore = create<GarageState>()(
         set((s) => ({ strava: { ...s.strava, ...strava } })),
 
       applyActivities: (rides) => {
-        const { processedRideIds, activities } = get();
+        const { processedRideIds } = get();
         const fresh = rides.filter((r) => !processedRideIds.includes(r.id));
         if (fresh.length === 0) {
           set({ strava: { ...get().strava, lastSyncAt: new Date().toISOString() } });
           return;
         }
-        set((s) => ({
-          bikes: applyRidesToBikes(s.bikes, fresh),
-          activities: [...fresh, ...activities].slice(0, 200),
-          processedRideIds: [...s.processedRideIds, ...fresh.map((r) => r.id)].slice(-1000),
-          strava: { ...s.strava, lastSyncAt: new Date().toISOString() },
-        }));
+        set((s) => {
+          const { bikes, rides: tagged } = distributeRides(s.bikes, fresh, s.defaultBikeId);
+          return {
+            bikes,
+            activities: [...tagged, ...s.activities].slice(0, 200),
+            processedRideIds: [...s.processedRideIds, ...fresh.map((r) => r.id)].slice(-1000),
+            strava: { ...s.strava, lastSyncAt: new Date().toISOString() },
+          };
+        });
       },
 
       addManualKm: (bikeId, km) => {
@@ -211,6 +229,7 @@ export const useGarageStore = create<GarageState>()(
           distanceKm: km,
           movingTimeSec: 0,
           startDate: new Date().toISOString(),
+          bikeId,
         };
         set((s) => ({
           bikes: s.bikes.map((b) =>

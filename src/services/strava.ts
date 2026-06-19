@@ -165,6 +165,27 @@ export async function fetchActivities(
     .map(mapActivity);
 }
 
+export interface StravaGear {
+  id: string;
+  name: string;
+  distanceKm: number;
+}
+
+/** Fetch the athlete's registered bikes (gear) so they can be mapped to garage bikes. */
+export async function fetchAthleteGear(accessToken: string): Promise<StravaGear[]> {
+  const res = await fetch('https://www.strava.com/api/v3/athlete', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Strava-Profil-Fehler (${res.status})`);
+  const data = await res.json();
+  const bikes: { id: string; name: string; distance?: number }[] = data.bikes ?? [];
+  return bikes.map((b) => ({
+    id: b.id,
+    name: b.name,
+    distanceKm: Math.round(((b.distance ?? 0) / 1000) * 10) / 10,
+  }));
+}
+
 /**
  * Generate a few plausible demo rides so the maintenance engine has something
  * to chew on without a real Strava connection.

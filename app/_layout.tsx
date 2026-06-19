@@ -2,12 +2,14 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NotificationsManager } from '../src/components/NotificationsManager';
 import { colors } from '../src/theme';
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
+      <NotificationsManager />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.bg },

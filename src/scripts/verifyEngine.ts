@@ -6,6 +6,11 @@ import { makeBike } from '../domain/factories';
 import { bikeHealth, buildRecommendations, computeWear } from '../domain/maintenanceEngine';
 import { computeStats, percentChange } from '../domain/stats';
 import { DEMO_PROVIDERS, distanceKm, formatPrice, sortByDistance } from '../domain/providers';
+import {
+  assignUnassignedByGear,
+  distributeRides,
+  moveRideToBike,
+} from '../domain/rideAssignment';
 import { RideActivity } from '../domain/types';
 
 let failures = 0;
@@ -101,6 +106,44 @@ assert(
 assert(formatPrice({ type: 'cleaning', label: 'x', priceFromEur: 19, priceToEur: 39 }) === '19–39 €', 'price range formats');
 assert(formatPrice({ type: 'cleaning', label: 'x', priceFromEur: 25 }) === 'ab 25 €', 'price "ab" formats');
 assert(formatPrice({ type: 'cleaning', label: 'x' }) === 'auf Anfrage', 'price "auf Anfrage" formats');
+
+console.log('\nRide → bike assignment:');
+const b1 = makeBike({ name: 'Renner', type: 'road', startKm: 0 });
+const b2 = makeBike({ name: 'Gravel', type: 'gravel', startKm: 0 });
+b1.stravaGearId = 'g1';
+const newRides: RideActivity[] = [
+  { id: 'r1', name: 'gear match', distanceKm: 10, movingTimeSec: 1200, startDate: '2026-06-18T08:00:00Z', gearId: 'g1' },
+  { id: 'r2', name: 'no gear', distanceKm: 20, movingTimeSec: 2400, startDate: '2026-06-18T09:00:00Z' },
+];
+// Two bikes, no default → r1 matches gear, r2 stays unassigned.
+const dist = distributeRides([b1, b2], newRides);
+const r1 = dist.rides.find((r) => r.id === 'r1')!;
+const r2 = dist.rides.find((r) => r.id === 'r2')!;
+assert(r1.bikeId === b1.id, 'ride with gear g1 assigned to matching bike');
+assert(r2.bikeId === undefined, 'ride without gear stays unassigned (2 bikes, no default)');
+assert(dist.bikes.find((b) => b.id === b1.id)!.totalKm === 10, 'matched bike odometer +10');
+
+// With default bike, the gearless ride is assigned to it.
+const dist2 = distributeRides([b1, b2], newRides, b2.id);
+assert(dist2.rides.find((r) => r.id === 'r2')!.bikeId === b2.id, 'gearless ride → default bike');
+assert(dist2.bikes.find((b) => b.id === b2.id)!.totalKm === 20, 'default bike odometer +20');
+
+// Single bike → everything goes to it.
+const solo = distributeRides([b2], newRides);
+assert(solo.rides.every((r) => r.bikeId === b2.id), 'single bike receives all rides');
+
+// Moving an unassigned ride later bumps the target odometer.
+const moved = moveRideToBike(dist.bikes, dist.rides, 'r2', b2.id);
+assert(moved.activities.find((r) => r.id === 'r2')!.bikeId === b2.id, 'ride moved to bike');
+assert(moved.bikes.find((b) => b.id === b2.id)!.totalKm === 20, 'moved bike odometer +20');
+
+// Linking a gear retro-assigns previously unassigned rides with that gear.
+const withGear: RideActivity[] = [
+  { id: 'r3', name: 'gear g9', distanceKm: 15, movingTimeSec: 1800, startDate: '2026-06-17T08:00:00Z', gearId: 'g9' },
+];
+const linked = assignUnassignedByGear([b1, b2], withGear, 'g9', b2.id);
+assert(linked.activities[0].bikeId === b2.id, 'gear link retro-assigns ride');
+assert(linked.bikes.find((b) => b.id === b2.id)!.totalKm === 15, 'retro-assign bumps odometer +15');
 
 if (failures > 0) {
   console.error(`\n${failures} assertion(s) failed`);

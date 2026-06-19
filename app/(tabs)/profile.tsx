@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Body, Card, H1, H2, Row } from '../../src/components/ui';
 import { RiderLevel } from '../../src/domain/types';
+import { cancelAllReminders, ensureNotificationPermission } from '../../src/services/notifications';
 import { useGarageStore } from '../../src/store/useGarageStore';
 import { colors, radius, spacing } from '../../src/theme';
 
@@ -30,6 +31,25 @@ export default function ProfileScreen() {
   const level = useGarageStore((s) => s.level);
   const setLevel = useGarageStore((s) => s.setLevel);
   const bikes = useGarageStore((s) => s.bikes);
+  const notificationsEnabled = useGarageStore((s) => s.notificationsEnabled);
+  const setNotificationsEnabled = useGarageStore((s) => s.setNotificationsEnabled);
+
+  const toggleNotifications = async () => {
+    if (notificationsEnabled) {
+      setNotificationsEnabled(false);
+      await cancelAllReminders();
+      return;
+    }
+    const granted = await ensureNotificationPermission();
+    if (!granted) {
+      Alert.alert(
+        'Mitteilungen aus',
+        'Bitte erlaube Mitteilungen für Bike Garage in den iPhone-Einstellungen, um Wartungserinnerungen zu erhalten.',
+      );
+      return;
+    }
+    setNotificationsEnabled(true);
+  };
 
   return (
     <ScrollView
@@ -61,6 +81,27 @@ export default function ProfileScreen() {
           </Pressable>
         );
       })}
+
+      <H2 style={{ marginTop: spacing.sm }}>Erinnerungen</H2>
+      <Card>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <Row style={{ flexShrink: 1 }}>
+            <Ionicons name="notifications-outline" size={20} color={colors.primary} />
+            <Body style={{ fontWeight: '700' }}>Wartungs-Erinnerungen</Body>
+          </Row>
+          <Pressable onPress={toggleNotifications}>
+            <Ionicons
+              name={notificationsEnabled ? 'toggle' : 'toggle-outline'}
+              size={36}
+              color={notificationsEnabled ? colors.primary : colors.textMuted}
+            />
+          </Pressable>
+        </Row>
+        <Body muted style={{ fontSize: 13 }}>
+          Wöchentlicher Check plus ein Hinweis, sobald nach einer Fahrt etwas fällig wird – als
+          Mitteilung direkt aufs iPhone.
+        </Body>
+      </Card>
 
       <Card style={{ marginTop: spacing.sm }}>
         <H2>Über die App</H2>

@@ -145,6 +145,8 @@ export interface RideActivity {
   startDate: string;
   /** Strava gear id the ride was logged with, if any. */
   gearId?: string;
+  /** Garage bike this ride has been assigned to (undefined = not yet assigned). */
+  bikeId?: string;
   /** Heuristic: was it a wet/dirty ride? Bumps cleaning/lube urgency. */
   wet?: boolean;
 }

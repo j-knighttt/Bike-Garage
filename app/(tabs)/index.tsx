@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Body, Button, Card, H1, H2, Row, UrgencyBadge } from '../../src/components/ui';
 import { bikeHealth, hadRecentWetRide } from '../../src/domain/maintenanceEngine';
@@ -12,10 +12,19 @@ import { colors, spacing } from '../../src/theme';
 export default function GarageScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const hydrated = useGarageStore((s) => s.hydrated);
   const bikes = useGarageStore((s) => s.bikes);
   const level = useGarageStore((s) => s.level);
   const activities = useGarageStore((s) => s.activities);
   const wet = hadRecentWetRide(activities);
+
+  if (!hydrated) {
+    return (
+      <View style={[styles.screen, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
